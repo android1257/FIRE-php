@@ -1,0 +1,13 @@
+config.yml
+cache
+result
+venv
+workspace
+Trace/v1/oldnew
+Trace/v2/oldnew
+__pycache__
+resource
+processed
+WordPress
+Test
+*.log
