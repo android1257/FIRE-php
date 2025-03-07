@@ -212,8 +212,8 @@ def detect_vulnerable_with_initialize(
                 jaccard_similarity(code_manager.ast_nodes, vuln_manager.ast_nodes),
                 jaccard_similarity(code_manager.ast_nodes, patch_manager.ast_nodes),
             )
-
-
+            
+            # logger.debug(f" vuln_sim, {vuln_sim}, patch_sim, {patch_sim}.")
             
             if vuln_sim < ast_sim_threshold_min:
                 vuln_cond.append(False)
@@ -252,13 +252,11 @@ def detect_vulnerable_with_initialize(
 
                         vuln_file = max(vuln_files, key = lambda x: ast_sim_dict[x])
                         
-                    if ast_sim_dict[vuln_file] > ast_sim_threshold_max and vuln_file not in near_sims_list:
+                    # if ast_sim_dict[vuln_file] > ast_sim_threshold_max and vuln_file not in near_sims_list:
                         
-                        vulnerable_func_queue.put((code, dst_file, [vuln_file]))
-                    else:
-                       
-                        output_list.append(vuln_file)
-                        
+                    #     vulnerable_func_queue.put((code, dst_file, [vuln_file]))
+                    # else:   
+                    output_list.append(vuln_file)
             else:
                 new_output_list = []
                 for vuln_file in output_list:

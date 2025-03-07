@@ -20,7 +20,7 @@ class ProjectDataset(Dataset.base.BaseDataset):
         logger.info("Preprocessing Target Function Dataset")
         logger.info(f"Extracting function from {project_dir} to {self.cache_dir}")
 
-        cmd = (f'{self.path_to_ctags} -R --kinds-C++=f -u --fields=-fP+ne --language-force=c --language-force=c++'
+        cmd = (f'{self.path_to_ctags} -R --kinds-PHP=f -u --fields=-fP+ne --language-force=php'
                f' --output-format=json -f - "{project_dir}"')
         logger.debug(f"{cmd}")
         all_function_list_str = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).decode(
@@ -40,7 +40,7 @@ class ProjectDataset(Dataset.base.BaseDataset):
                 continue
             if info["path"] != current_file:
                 ext = os.path.splitext(info["path"])[1].lower()
-                if ext not in [".c", ".cc", ".cxx", ".cpp", ".c++", "cp", ".h", ".hh", "hp", ".hpp", ".hxx", ".h++"]:
+                if ext not in [".php", ".php3", ".php4", ".php5", ".php7", ".phtml"]:
                     continue
                 try:
                     with open(info["path"]) as f:
@@ -51,10 +51,12 @@ class ProjectDataset(Dataset.base.BaseDataset):
                     continue
             # Get Function Range
             start_line = info["line"] - 1
-            if "end" not in info:
-                continue
-            end_line = info["end"]
+            # Find the end line of the function
+            end_line = Dataset.utils.find_function_end(current_code, start_line)
 
+            if end_line >= len(current_code):
+                logger.warning(f"Function end not found in {info['path']}")
+                continue
             # Reconstruct function declaration since sometimes they are something missing
             try:
                 if "typeref" in info:
@@ -70,13 +72,13 @@ class ProjectDataset(Dataset.base.BaseDataset):
                         func_type += " "
                 else:
                     func_type = ""
-                func_decl_parts = current_code[start_line].split(info["name"], 1)
-                if len(func_decl_parts) >= 2:
-                    current_code[start_line] = f"{func_type}{info['name']}{func_decl_parts[1]}"
+                # func_decl_parts = current_code[start_line].split(info["name"], 1)
+                # if len(func_decl_parts) >= 2:
+                #     current_code[start_line] = f"{func_type}{info['name']}{func_decl_parts[1]}"
                 # Or we'll give up Reconstructing Declaration
             except Exception as e:
                 logger.warning("Function Declaration Parse Error: {}".format(e))
-            func_body = "\n".join(current_code[start_line:end_line])
+            func_body = "\n".join(current_code[start_line:end_line + 1])
             # function_body purification
             func_body = Dataset.utils.function_purification(func_body, self.skip_loc_threshold)
             if func_body == "":

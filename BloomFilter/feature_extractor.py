@@ -10,11 +10,11 @@ from pygments.token import Token
 
 
 class OperatorStateMachine:
-    _Operators = frozenset(['++', '--', '+', '-', '*', '/', '%', '=', '+=', '-=', '*=', '/=', '%=', '<<=',
-                            '>>=', '&=', '^=', '|=', '&&', '||', '!', '==', '!=', '>=', '<=', '>', '<', '&',
-                            '|', '<<', '>>', '~', '^', '->'])  # 42
-    _double_operator = frozenset(["&", "+", "-", "|"])
-    _double_operator2 = frozenset(["<", ">"])
+    _Operators = frozenset(['++', '--', '+', '-', '*', '/', '%', '=', '+=', '-=', '*=', '/=', '%=', '<<=','>>=', '&=', '^=', 
+                            '|=', '&&', '||', '!', '==', '!=', '>=', '<=', '>', '<', '&', '|', '<<', '>>', '~', '^', '->',
+                            "<>", "<=>", "===", "!==", "??=", "**", ".", ".=", "@", "=>", "??", "?:"])  # 42
+    _double_operator = frozenset(["&", "+", "-", "|", "*"])
+    _double_operator2 = frozenset(["<", ">", "?"])
 
     def __init__(self):
         self.current_state = ""
@@ -36,10 +36,14 @@ class OperatorStateMachine:
         elif len(self.current_state) == 1:
             op = self.current_state + current
             if current == "=":
+                if self.current_state in ("=", "<"):
+                    self.current_state = op # === and <=>
+                    return None
                 self.current_state = ""
                 return op
+                
             elif current == self.current_state:
-                if current in self._double_operator:  # && ++ -- ||
+                if current in self._double_operator:  # && ++ -- || **
                     self.current_state = ""
                     return op
                 if current in self._double_operator2:  # << >> may go to <<= and >>=
@@ -49,16 +53,16 @@ class OperatorStateMachine:
                     op = self.current_state
                     self.current_state = current
                     return op
-            elif op == "->":
+            elif op in ("<>", "->", "=>"):
                 self.current_state = ""
-                return "->"
+                return op
             else:
                 op = self.current_state
                 self.current_state = current
                 return op
         else:
             op = self.current_state + current
-            if current == "=":  # only <<= and >>=
+            if current == "=":  # only <<= , >>= , === and ??=
                 self.current_state = ""
                 return op
             else:
@@ -69,31 +73,51 @@ class OperatorStateMachine:
 
 
 class FeatureExtractor:
-    _APIs = ['alloc', 'free', 'mem', 'copy', 'new', 'open', 'close', 'delete', 'create', 'release',
-             'sizeof', 'remove', 'clear', 'dequene', 'enquene', 'detach', 'Attach', 'str', 'string',
-             'lock', 'mutex', 'spin', 'init', 'register', 'disable', 'enable', 'put', 'get', 'up',
-             'down', 'inc', 'dec', 'add', 'sub', 'set', 'map', 'stop', 'start', 'prepare', 'suspend',
-             'resume', 'connect']  # 42
+    # _APIs = ['alloc', 'free', 'mem', 'copy', 'new', 'open', 'close', 'delete', 'create', 'release',
+    #          'sizeof', 'remove', 'clear', 'dequene', 'enquene', 'detach', 'Attach', 'str', 'string',
+    #          'lock', 'mutex', 'spin', 'init', 'register', 'disable', 'enable', 'put', 'get', 'up',
+    #          'down', 'inc', 'dec', 'add', 'sub', 'set', 'map', 'stop', 'start', 'prepare', 'suspend',
+    #          'resume', 'connect']  # 42
+    _APIs = ['isset', 'unset', 'empty', 'strlen', 'str_replace', 'strpos', 'substr',
+             'trim', 'array_merge', 'array_push', 'array_pop', 'array_shift', 'array_unshift', 
+             'array_key_exists', 'in_array', 'count', 'json_encode', 'json_decode', 'serialize',
+             'unserialize', 'fopen', 'fclose', 'fread', 'fwrite', 'file_get_contents', 'file_put_contents',
+             'mkdir', 'unlink', 'copy', 'move_uploaded_file', 'chmod', 'chown', 'chdir', 
+             'getcwd', 'rename', 'touch', 'opendir', 'readdir', 'closedir', 'exec', 'system',
+             'shell_exec', 'eval'] 
+    # _Formatted_strings = ['d', 'i', 'o', 'u', 'x', 'X', 'f', 'F', 'e', 'E', 'g', 'G',
+    #                       'a', 'A', 'c', 'C', 's', 'S', 'p', 'n']  # 21
+    _Formatted_strings = ['b', 'c', 'd', 'e', 'f', 'F', 'g', 'G', 'h', 'H', 'o', 's', 'u', 'x', 'X']
 
-    _Formatted_strings = ['d', 'i', 'o', 'u', 'x', 'X', 'f', 'F', 'e', 'E', 'g', 'G',
-                          'a', 'A', 'c', 'C', 's', 'S', 'p', 'n']  # 21
-
-    _Operators = ['bitand', 'bitor', 'xor', 'not', 'not_eq', 'or', 'or_eq', 'and', '++', '--',
-                  '+', '-', '*', '/', '%', '=', '+=', '-=', '*=', '/=', '%=', '<<=',
-                  '>>=', '&=', '^=', '|=', '&&', '||', '!', '==', '!=', '>=', '<=', '>', '<', '&',
-                  '|', '<<', '>>', '~', '^', '->']  # 42
-
-    _Keywords = ['asm', 'auto', 'alignas', 'alignof', 'bool', 'break', 'case',
-                 'catch', 'char', 'char16_t', 'char32_t', 'class', 'const', 'const_cast',
-                 'constexpr', 'continue', 'decltype', 'default', 'do', 'double',
-                 'dynamic_cast', 'else', 'enum', 'explicit', 'export', 'extern', 'false', 'float',
-                 'for', 'friend', 'goto', 'if', 'inline', 'int', 'long', 'mutable', 'namespace',
-                 'noexcept', 'nullptr', 'operator', 'private', 'protected', 'public',
-                 'reinterpret_cast', 'return', 'short', 'signed', 'static',
-                 'static_assert', 'static_cast', 'struct', 'switch', 'template', 'this',
-                 'thread_local', 'throw', 'true', 'try', 'typedef', 'typeid', 'typename', 'union',
-                 'unsigned', 'using', 'virtual', 'void', 'volatile', 'wchar_t', 'while', 'compl',
-                 'override', 'final', 'assert']  # 77
+    # _Operators = ['bitand', 'bitor', 'xor', 'not', 'not_eq', 'or', 'or_eq', 'and', '++', '--',
+    #               '+', '-', '*', '/', '%', '=', '+=', '-=', '*=', '/=', '%=', '<<=',
+    #               '>>=', '&=', '^=', '|=', '&&', '||', '!', '==', '!=', '>=', '<=', '>', '<', '&',
+    #               '|', '<<', '>>', '~', '^', '->']  # 42
+    _Operators = ['xor', 'or', 'and', '++', '--', '+', '-', '*', '/', '%', '=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=',
+                  '&=', '^=', '|=', '&&', '||', '!', '==', '!=', '>=', '<=', '>', '<', '&', '|', '<<', '>>', '~', '^', '->',
+                  "<>", "<=>", "===", "!==", "??=", "**", ".", ".=", "@", "=>", "??", "?:"]
+    # _Keywords = ['asm', 'auto', 'alignas', 'alignof', 'bool', 'break', 'case',
+    #              'catch', 'char', 'char16_t', 'char32_t', 'class', 'const', 'const_cast',
+    #              'constexpr', 'continue', 'decltype', 'default', 'do', 'double',
+    #              'dynamic_cast', 'else', 'enum', 'explicit', 'export', 'extern', 'false', 'float',
+    #              'for', 'friend', 'goto', 'if', 'inline', 'int', 'long', 'mutable', 'namespace',
+    #              'noexcept', 'nullptr', 'operator', 'private', 'protected', 'public',
+    #              'reinterpret_cast', 'return', 'short', 'signed', 'static',
+    #              'static_assert', 'static_cast', 'struct', 'switch', 'template', 'this',
+    #              'thread_local', 'throw', 'true', 'try', 'typedef', 'typeid', 'typename', 'union',
+    #              'unsigned', 'using', 'virtual', 'void', 'volatile', 'wchar_t', 'while', 'compl',
+    #              'override', 'final', 'assert']  # 77
+    _Keywords = ['__halt_compiler', 'abstract', 'array', 'as', 'break', 'callable',
+                'case', 'catch', 'class', 'clone', 'const', 'continue', 'declare', 'default',
+                'die', 'do', 'echo', 'else', 'elseif', 'empty', 'enddeclare', 'endfor',
+                'endforeach', 'endif', 'endswitch', 'endwhile', 'eval', 'exit', 'extends', 
+                'final', 'for', 'foreach', 'function', 'global', 'goto', 'if', 'implements', 
+                'include', 'include_once', 'instanceof', 'insteadof', 'interface', 'isset', 
+                'list', 'namespace', 'new', 'print', 'private', 'protected', 'public', 
+                'require', 'require_once', 'return', 'static', 'switch', 'throw', 'trait', 
+                'try', 'unset', 'use', 'var', 'while','yield', 'int', 'float', 'string', 
+                'bool', 'array', 'object', 'callable', 'iterable', 'void', 'mixed', 'null', 
+                'false', 'true']
 
     def __init__(self):
         self._No_Formatted_string_List = self._APIs + self._Operators + self._Keywords
