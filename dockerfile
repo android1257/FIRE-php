@@ -27,13 +27,13 @@ RUN cd resource/redis-7.2.3 && \
     make && \
     make install && \
     cd .. && \
-    rm -rf /usr/src/app/resources/redis-7.2.3
+    rm -rf /usr/src/app/resource/redis-7.2.3
 
-ENV JAVA_HOME "/usr/src/app/resources/jdk-17.0.11"
+ENV JAVA_HOME "/usr/src/app/resource/jdk-17.0.11"
 ENV PATH $PATH:$JAVA_HOME/bin
 
-CMD redis-server --port 6380
+# CMD redis-server --port 6379
 
-# EXPOSE 8000
+EXPOSE 8000
 
-# CMD redis-server --daemonize yes && python3 server.py
+CMD redis-server --daemonize yes && python3 server.py

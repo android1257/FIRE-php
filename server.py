@@ -33,7 +33,7 @@ def process():
     if not process_running:
         process_running = True
         try:
-            shutil.copy("config.default.yml", "config.yml")
+            # shutil.copy("config.default.yml", "config.yml")
             git_url = request.args.get('git_url', '')
             branch = request.args.get('branch', '')
             jaccard_sim_threshold_str = request.args.get('jaccard_sim_threshold', '0.7')
@@ -44,11 +44,14 @@ def process():
 
             if git_url and branch:
                 git_name = os.path.basename(git_url.rstrip('/'))
-                subprocess.call('git clone --branch %s --depth=1 %s' % (branch, git_url), shell=True)
+                repo_dir = os.path.join("github_repos", git_name)
+                if not os.path.exists("github_repos"):
+                    os.makedirs("github_repos")
+                subprocess.call('git clone --branch %s --depth=1 %s %s' % (branch, git_url, repo_dir), shell=True)
                 start_time = time.time()
-                code = subprocess.call('python3 main.py %s' % git_name, shell=True)
+                code = subprocess.call('python3 main.py %s' % repo_dir, shell=True)
                 end_time = time.time()
-                shutil.rmtree(git_name)
+                shutil.rmtree(repo_dir)
                 if code != 0:
                     process_running = False
                     return json.dumps({'Error': 'Detect Failed'}), 500
